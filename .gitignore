@@ -1,0 +1,10 @@
+/.idea
+/.vscode
+/vendor
+*.log
+.env
+/启动.bat
+/composer.lock
+/public/storage/
+/app/admin/command/Install/install.lock
+/public/assets/libs/

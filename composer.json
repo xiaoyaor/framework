@@ -1,0 +1,52 @@
+{
+    "name": "xiaoyaor/framework",
+    "description": "an easy thinkphp framework",
+    "type": "project",
+    "keywords": [
+        "framework",
+        "thinkphp",
+        "easyadmin",
+        "ORM"
+    ],
+    "homepage": "http://www.easyadmin.vip/",
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "xiaoyaor",
+            "email": "747976016@qq.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.1.0",
+        "topthink/framework": "^6.0.0",
+        "topthink/think-orm": "^2.0",
+        "topthink/think-multi-app": "^1.0",
+        "topthink/think-captcha": "^3.0",
+        "phpoffice/phpspreadsheet": "^1.9",
+        "overtrue/pinyin": "^4.0",
+        "xiaoyaor/thinkphp-jump": "^1.0.2",
+        "xiaoyaor/think-addons": "^1.0.1",
+        "phpmailer/phpmailer": "^6.1"
+    },
+    "require-dev": {
+        "symfony/var-dumper": "^4.2",
+        "topthink/think-trace":"^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "app\\": "app"
+        },
+        "psr-0": {
+            "": "extend/"
+        }
+    },
+    "config": {
+        "preferred-install": "dist"
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "@php think service:discover",
+            "@php think vendor:publish"
+        ]
+    }
+}
