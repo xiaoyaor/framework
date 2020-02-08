@@ -2,6 +2,7 @@
 
 namespace app\admin\library\traits;
 
+use app\admin\library\Auth;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 use PhpOffice\PhpSpreadsheet\Reader\Xls;

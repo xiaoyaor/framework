@@ -26,7 +26,12 @@
         "overtrue/pinyin": "^4.0",
         "xiaoyaor/thinkphp-jump": "^1.0.2",
         "xiaoyaor/think-addons": "^1.0.1",
-        "phpmailer/phpmailer": "^6.1"
+        "phpmailer/phpmailer": "^6.1",
+        "xiaoyaor/think-hash": "^1.0",
+      "ext-json": "*",
+      "ext-zip": "*",
+      "ext-gd": "*",
+        "ext-iconv": "*"
     },
     "require-dev": {
         "symfony/var-dumper": "^4.2",

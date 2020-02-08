@@ -32,7 +32,6 @@ class Addon extends Backend
      */
     public function index()
     {
-        //(new Hash(''))->start();
         $addons = get_addon_list();
         foreach ($addons as $k => &$v) {
             $config = get_addon_config($v['name']);
@@ -47,6 +46,7 @@ class Addon extends Backend
 
     /**
      * 配置
+     * @throws \Exception
      */
     public function config($ids = null)
     {
@@ -259,7 +259,8 @@ class Addon extends Backend
         if (!is_dir($addonTmpDir)) {
             @mkdir($addonTmpDir, 0755, true);
         }
-        $info = $file->move($addonTmpDir,$file->getOriginalName());
+        //$info = $file->move($addonTmpDir,$file->getOriginalName());
+        $info = moveFile($file->getPathname(),$addonTmpDir,$file->hash().'.zip');
         if ($info) {
             $tmpName = substr($info->getFilename(), 0, stripos($info->getFilename(), '.'));
             $tmpAddonDir = ADDON_PATH . $tmpName . DIRECTORY_SEPARATOR;
@@ -268,7 +269,9 @@ class Addon extends Backend
                 Service::unzip($tmpName);
                 unset($info);
                 @unlink($tmpFile);
-                $infoFile = $tmpAddonDir . $tmpName.'.ini';
+                $fileArr=getAllFiles($tmpAddonDir,'.ini');
+                $fileArr?$tmpName=$fileArr[0]:$tmpName='';
+                $infoFile = $tmpAddonDir . $tmpName;
                 if (!is_file($infoFile)) {
                     throw new Exception(__('Addon info file was not found'));
                 }
@@ -284,13 +287,13 @@ class Addon extends Backend
 
                 $newAddonDir = ADDON_PATH . $name . DIRECTORY_SEPARATOR;
                 if (is_dir($newAddonDir)) {
-                    //throw new Exception(__('Addon already exists'));
+                    throw new Exception(__('Addon already exists'));
                 }
 
                 //重命名插件文件夹
                 rename($tmpAddonDir, $newAddonDir);
                 try {
-                    //默认禁用该插件
+                    //默认禁用该插件copydirs
                     $info = get_addon_info($name);
                     if ($info['state']) {
                         $info['state'] = 0;

@@ -18,7 +18,6 @@ class Index extends Frontend
     public function __construct()
     {
         parent::__construct();
-        Config::set(['layout_on'=>'','layout_name'=>''],'view');
     }
 
     public function index()

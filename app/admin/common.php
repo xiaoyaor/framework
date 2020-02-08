@@ -2,9 +2,13 @@
 // 这是系统自动生成的公共文件
 use app\common\model\Config as ConfigModel;
 use Overtrue\Pinyin\Pinyin;
+use think\exception\FileException;
 use think\facade\Config;
+use think\facade\Env;
+use think\facade\Event;
 use think\facade\Request;
 use think\facade\Session;
+use think\File;
 use think\Model;
 use app\common\model\Category;
 use easy\Form;
@@ -106,7 +110,10 @@ if (!function_exists('build_toolbar')) {
      */
     function build_toolbar($btns = NULL, $attr = [])
     {
-        //$auth = \app\admin\library\Auth::instance();
+        //授权验证hook
+        if (Event::trigger('Auth')){
+            $auth = \app\admin\library\Auth::instance();
+        }
         $controller = str_replace('.', '/', strtolower(Request::instance()->controller()));
         $btns = $btns ? $btns : ['refresh', 'add', 'edit', 'del', 'import'];
         $btns = is_array($btns) ? $btns : explode(',', $btns);
@@ -125,9 +132,9 @@ if (!function_exists('build_toolbar')) {
         $html = [];
         foreach ($btns as $k => $v) {
             //如果未定义或没有权限
-//            if (!isset($btnAttr[$v]) || ($v !== 'refresh' && !$auth->check("{$controller}/{$v}"))) {
-//                continue;
-//            }
+            if (!isset($btnAttr[$v]) || ($v !== 'refresh' && !$auth->check("{$controller}/{$v}"))) {
+                continue;
+            }
             list($href, $class, $icon, $text, $title) = $btnAttr[$v];
             $extend = $v == 'import' ? 'id="btn-import-file" data-url="ajax/upload" data-mimetype="csv,xls,xlsx" data-multiple="false"' : '';
             $html[] = '<a href="' . $href . '" class="' . $class . '" title="' . $title . '" ' . $extend . '><i class="' . $icon . '"></i> ' . $text . '</a>';
@@ -153,14 +160,20 @@ if (!function_exists('build_heading')) {
             $path = strtolower($controller . ($action && $action != 'index' ? '/' . $action : ''));
         }
         // 根据当前的URI自动匹配父节点的标题和备注
+        // 验证表是否存在
         $data=[];
-        $rules=Config::get('menu');
-        foreach ($rules as $rule) {
-            if ($rule['name']==$path){
-                $data=$rule;
+        $tableName=Env::get('database.prefix', '').'auth_rule';
+        $isTable=Db::query('SHOW TABLES LIKE '."'".$tableName."'");
+        if($isTable){
+            $data = Db::name('auth_rule')->where('name', $path)->field('title,remark')->find();
+        }else{
+            $menu=Config::get('menu');
+            foreach ($menu as $key=>$value){
+                if ($path == $value['name']){
+                    $data=['title' => "Addon", 'remark' => "Addon tips"];
+                }
             }
         }
-        //$data = Db::name('auth_rule')->where('name', $path)->field('title,remark')->find();
         if ($data) {
             $title = __($data['title']);
             $content = __($data['remark']);
@@ -178,29 +191,36 @@ if (!function_exists('build_heading')) {
 if (!function_exists('change_site')) {
 
     /**
+     * 修改site.php存储的网站配置文件
+     * 有config数据库则写入信息到数据库
+     * 使用时用Config调用
      * @param string $key
      * @param string $val
      * @return bool
      */
-    function  change_site($key='',$val='')
+    function change_site($key='',$val='')
     {
-        event_trigger('ConfigInfo');
-        //$model = new ConfigModel();
-        $menu=Config::get('site');
         $config = [];
-        foreach ($menu as $k => $value) {
-            //$value = $v->toArray();
-//            if (in_array($value['type'], ['selects', 'checkbox', 'images', 'files'])) {
-//                $value['value'] = explode(',', $value['value']);
-//            }
-//            if ($value['type'] == 'array') {
-//                $value['value'] = (array)json_decode($value['value'], true);
-//            }
-            $config[$k] = $value;
-            if ($key != '' && $k == $key){
-                $config[$k] = $val;
-                //(new ConfigModel())::where(['name'=>$key])->save(['value'=>$val]);
+        $config_exist=event_trigger('Config');//Config插件函数钩子，使用此函数判断是否将信息写入数据表
+        if($config_exist){
+            $model = new ConfigModel();
+            foreach ($model->select() as $k => $v) {
+                $value = $v->toArray();
+                if (in_array($value['type'], ['selects', 'checkbox', 'images', 'files'])) {
+                    $value['value'] = explode(',', $value['value']);
+                }
+                if ($value['type'] == 'array') {
+                    $value['value'] = (array)json_decode($value['value'], true);
+                }
+                $config[$value['name']] = $value['value'];
+                if ($key != '' && $value['name'] == $key){
+                    $config[$value['name']] = $val;
+                    (new ConfigModel())::where(['name'=>$key])->save(['value'=>$val]);
+                }
             }
+        }else{
+            $config=Config::get('site');
+            $config[$key]=$val;
         }
         file_put_contents(root_path() . 'config' . DIRECTORY_SEPARATOR . 'site.php','<?php' . "\n\nreturn " . var_export($config, true) . ";");
         return true;
@@ -402,5 +422,121 @@ if (!function_exists('getBreadCrumb')) {
             }
         }
         return $breadcrumb;
+    }
+}
+
+
+if (!function_exists('moveFile')){
+
+    /**
+     * 上传文件
+     * @access public
+     * @param string      $path 文件路径
+     * @param string      $directory 保存路径
+     * @param string|null $name      保存的文件名
+     * @return File
+     */
+    function moveFile(string $path, string $directory, string $name = null): File
+    {
+        $file=new File($path,true);
+        if ($file) {
+
+            $directory = rtrim($directory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+            $target = $directory. $name;
+
+            set_error_handler(function ($type, $msg) use (&$error) {
+                $error = $msg;
+            });
+
+            $moved = move_uploaded_file($file->getPathname(), $target);
+            restore_error_handler();
+            if (!$moved) {
+                throw new FileException(sprintf('Could not move the file "%s" to "%s" (%s)', $file->getPathname(), $target, strip_tags($error)));
+            }
+
+            @chmod($target, 0666 & ~umask());
+
+            return new File($target,true);;
+        }
+    }
+}
+
+if (!function_exists('getAllFiles')){
+
+    /**
+     * 获取单层文件夹下的指定后缀文件
+     * @access public
+     * @param string      $path 文件路径
+     * @param string      $suffix 后缀
+     * @return array
+     */
+    function getAllFiles(string $path , string $suffix = '*')
+    {
+        $files=[];
+        $handler = opendir($path);
+        while (($filename = readdir($handler)) !== false) {//务必使用!==，防止目录下出现类似文件名“0”等情况
+            if ($filename != "." && $filename != "..") {
+                if ($suffix == "*.*" || $suffix == "*") {
+                    if(is_file($filename)){
+                        $files[] = $filename ;
+                    }
+                }else if(substr($filename,0-strlen($suffix))==$suffix){
+                    $files[] = $filename ;
+                }
+            }
+        }
+        closedir($handler);
+        return $files;
+    }
+}
+
+if (!function_exists('readAllDir')){
+
+    /**
+     * 获取文件夹下的所有文件,树状结构
+     * @access public
+     * @param string      $path 路径
+     * @return array
+     */
+    function readAllDir(string $path )
+    {
+        $arr = array();
+        $hander = scandir($path);
+        foreach ($hander as $v) {
+            if (is_dir($path . DIRECTORY_SEPARATOR . $v) && $v != "." && $v != "..") {
+                $arr[$v] = readAllDir($path . DIRECTORY_SEPARATOR . $v);//递归调用
+            }else{
+                if($v != "." && $v != ".."){
+                    $arr[]=$v;
+                }
+            }
+        }
+        return $arr;
+    }
+}
+
+if (!function_exists('delDirAndFile')){
+
+    /**
+     * 删除指定文件夹以及文件夹下的目录文件
+     * @access public
+     * @param string      $dirName 文件夹路径
+     * @return boolean
+     */
+    function delDirAndFile( $dirName ){
+        if($handle=opendir($dirName)){
+            while(false!==($item=readdir($handle))){
+                if($item!="."&&$item!=".."){
+                    if(is_dir("$dirName/$item")){
+                        delDirAndFile("$dirName/$item");
+                    }else{
+                        unlink("$dirName/$item");
+                    }
+                }
+            }
+            closedir($handle);
+            //rmdir($dirName);
+        }
+        return true;
     }
 }

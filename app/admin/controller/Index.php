@@ -22,9 +22,7 @@ class Index extends Backend
     public function __construct()
     {
         parent::__construct();
-        // 控制器初始化
-        parent::_initialize();
-        Config::set(['layout_on'=>'','layout_name'=>''],'view');
+        View::engine()->layout(false);
     }
 
     /**
@@ -39,8 +37,7 @@ class Index extends Backend
         if (!$this->auth){
             list($menulist, $navlist, $fixedmenu, $referermenu) = getSidebar($flag, Config::get('site.fixedpage'));
         }else{
-            list($menulist, $navlist, $fixedmenu, $referermenu) = event_trigger('AuthRule');
-                //$this->auth->getSidebar($flag, Config::get('site.fixedpage'));
+            list($menulist, $navlist, $fixedmenu, $referermenu) = $this->auth->getSidebar($flag, Config::get('site.fixedpage'));
         }
         $action = Request::request('action');
         if (Request::isPost()) {
